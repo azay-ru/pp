@@ -14,6 +14,8 @@ import (
 	snmp "github.com/soniah/gosnmp"
 )
 
+var version = "0.0.1" // Use go build -ldflags "-X main.version=XX.YY.ZZ" to define your version
+
 // PrintDevice Information for one print device
 type PrintDevice struct {
 	Host   string // IP or hostname (?!)
@@ -27,8 +29,6 @@ var ErrUnknownVendor = errors.New("Unknown vendor")
 
 var PrintDevices []PrintDevice
 
-// var logerr *log.Logger
-var version = "Undefined"
 var Vendors = []string{"hp", "kyocera"}
 var IPaddr, // Show IP address
 	Serial, //  - serial number
@@ -42,7 +42,7 @@ var IPaddr, // Show IP address
 	Verbose bool
 
 func main() {
-	fmt.Printf("Printed pages count, v.%s\n", version)
+	fmt.Printf("printed pages, v.%s\n", version)
 
 	err := getConfig()
 	if err != nil {
@@ -64,7 +64,7 @@ func main() {
 // getConfig read params from command line and preset basic config
 func getConfig() error {
 	flag.Usage = func() {
-		fmt.Println("Usage: ppc -p <...> | -f <file> [-n][-s][-v]")
+		fmt.Println("Usage: pp -p <...> | -f <file> [-n][-s][-v]")
 		flag.PrintDefaults()
 	}
 
