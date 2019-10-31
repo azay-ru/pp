@@ -2,30 +2,39 @@ package main
 
 import (
 	"bufio"
+	"encoding/xml"
 	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/kr/pretty"
 	snmp "github.com/soniah/gosnmp"
+)
+
+// Exported format
+
+const (
+	Xml = iota
+	Json
+	CSV
 )
 
 var version = "0.0.1" // Use go build -ldflags "-X main.version=XX.YY.ZZ" to define your version
 
 // PrintDevice Information for one print device
 type PrintDevice struct {
-	Host   string // IP or hostname (?!)
-	vendor string
-	Serial string
-	Pages  int64
-	ok     bool
-}
+	Host   string `xml:"host,attr" json:"host"`
+	Serial string `xml:"serial" json:"id"`
+	Pages  string `xml:"pages" json:"pages"`
 
-var ErrUnknownVendor = errors.New("Unknown vendor")
+	export byte   `xml:"-" json:"-"`
+	vendor string `xml:"-" json:"-"`
+	ok     bool   `xml:"-" json:"-"`
+}
 
 var PrintDevices []PrintDevice
 
@@ -41,33 +50,39 @@ var IPaddr, // Show IP address
 	DontDetect,
 	Verbose bool
 
+var ErrUnknownVendor = errors.New("Unknown vendor")
+
 func main() {
-	fmt.Printf("printed pages, v.%s\n", version)
+	fmt.Printf("Printed pages, v.%s\n", version)
 
 	err := getConfig()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 
-	for _, p := range PrintDevices {
-		if err := GetData(&p); err != nil {
+	for i := 0; i < len(PrintDevices); i++ {
+		// for _, p := range PrintDevices {
+		if err := GetData(&PrintDevices[i]); err != nil {
 			log.Println(err.Error())
 		} else {
-			p.ok = true
-			fmt.Printf("%v\n", p)
+			PrintDevices[i].ok = true
+			// fmt.Printf("---\n%v\n---\n", PrintDevices[i])
+
 		}
 	}
 
-	fmt.Printf("===\n%# v\n", pretty.Formatter(PrintDevices))
+	Export(&PrintDevices)
+	// fmt.Printf("===\n%# v\n", pretty.Formatter(PrintDevices)) // debug print
 }
 
 // getConfig read params from command line and preset basic config
 func getConfig() error {
 	flag.Usage = func() {
-		fmt.Println("Usage: pp -p <...> | -f <file> [-n][-s][-v]")
+		fmt.Println("Usage: pp -p <...> | -f <file> [-n][-s][-v] [-o <file>] [-format xml|json|csv]")
 		flag.PrintDefaults()
 	}
 
+	var export, outfile string
 	var printers []string
 	var iPrinters,
 		fPrinters string
@@ -77,17 +92,15 @@ func getConfig() error {
 	flag.BoolVar(&DontDetect, "n", false, "Don't auto detect device vendor, if not specified")
 	flag.StringVar(&iPrinters, "p", "", "IP address of printers, comma separated: <host1[:vendor]>,<host2[:vendor]>...")
 	flag.StringVar(&fPrinters, "f", "", "file that contain name or IP addresses of print devices, one per line <host>[:vendor]")
-
+	flag.StringVar(&export, "format", "xml", "output format: xml|json|csv")
+	flag.StringVar(&outfile, "o", "", "output file name.")
 	flag.Parse()
 
 	// Add printers from -p <...>
 	if len(iPrinters) > 0 {
 		printers = strings.Split(iPrinters, ",")
-		// if len(printers) == 0 {
-		// 	return fmt.Errorf("Input list is empty")
-		// }
-
 	}
+
 	// Add printers from -f <file>
 	if len(fPrinters) > 0 {
 		if _, err := os.Stat(fPrinters); os.IsExist(err) {
@@ -164,6 +177,19 @@ func GetVendor(v string) ([]string, error) {
 	return oids, nil
 }
 
+// DecodeASN1 convert ANS.1 field to printable type
+func DecodeASN1(v snmp.SnmpPDU) string {
+	// fmt.Printf("%# v\n", pretty.Formatter(v))	// debug print
+	switch v.Type {
+	case snmp.OctetString:
+		return string(v.Value.([]byte))
+	case snmp.Counter32:
+		return strconv.FormatUint(uint64((v.Value.(uint))), 10)
+	default:
+		return ""
+	}
+}
+
 // GetData request data from defined print devices
 func GetData(pd *PrintDevice) error {
 	// var oids []string
@@ -182,15 +208,36 @@ func GetData(pd *PrintDevice) error {
 	if result, err := snmp.Default.Get(oids); err != nil {
 		return fmt.Errorf("Error SNMP request to %v\n", pd.Host)
 	} else {
-		for n, _ := range result.Variables {
+		for n, v := range result.Variables {
 			switch n {
 			case 0:
-
-				pd.Serial = "SN"
+				pd.Serial = DecodeASN1(v)
 			case 1:
-				pd.Pages = 1 //snmp.ToBigInt(v.Value)
+				pd.Pages = DecodeASN1(v) //snmp.ToBigInt(v.Value)
 			}
 		}
 	}
+	return nil
+}
+
+func Export(pd *[]PrintDevice) error {
+	type XML struct {
+		XMLName     xml.Name      `xml:"devices"`
+		PrintDevice []PrintDevice `xml:"device"`
+	}
+	export := XML{}
+	var output []byte
+
+	for _, v := range *pd {
+		if v.ok {
+			export.PrintDevice = append(export.PrintDevice, v)
+		}
+	}
+
+	output, err := xml.MarshalIndent(export, "", "  ")
+	if err != nil {
+		fmt.Printf("error: %v\n", err)
+	}
+	os.Stdout.Write(output)
 	return nil
 }
