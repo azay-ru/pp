@@ -47,18 +47,25 @@ var IPaddr, // Show IP address
 	// Capacity, //  - cartridge Capacity
 	// Color, //  - color of cartridge
 	SkipEmpty,
-	DontDetect,
-	Verbose bool
+	DontDetect bool
 
-var ErrUnknownVendor = errors.New("Unknown vendor")
+var (
+	ErrUnknownVendor = errors.New("Unknown vendor")
+	JustHelp         = errors.New("Help")
+)
 
 func main() {
-	fmt.Printf("Printed pages, v.%s\n", version)
-
+	log.SetOutput(os.Stderr)
 	err := getConfig()
-	if err != nil {
+	if err == JustHelp {
+		return
+	} else if err != nil {
 		log.Fatalf(err.Error())
 	}
+
+	// if len(PrintDevices) == 0 {
+	// 	return
+	// }
 
 	for i := 0; i < len(PrintDevices); i++ {
 		// for _, p := range PrintDevices {
@@ -78,7 +85,7 @@ func main() {
 // getConfig read params from command line and preset basic config
 func getConfig() error {
 	flag.Usage = func() {
-		fmt.Println("Usage: pp -p <...> | -f <file> [-n][-s][-v] [-o <file>] [-format xml|json|csv]")
+		fmt.Printf("Printed pages, v.%s\nUsage:\npp -p <...> | -f <file> [-n][-s][-v] [-o <file>] [-format xml|json|csv]\n", version)
 		flag.PrintDefaults()
 	}
 
@@ -87,11 +94,10 @@ func getConfig() error {
 	var iPrinters,
 		fPrinters string
 
-	flag.BoolVar(&Verbose, "v", false, "Verbose mode")
 	flag.BoolVar(&SkipEmpty, "s", false, "Skip unavailable or undetectable devices")
 	flag.BoolVar(&DontDetect, "n", false, "Don't auto detect device vendor, if not specified")
 	flag.StringVar(&iPrinters, "p", "", "IP address of printers, comma separated: <host1[:vendor]>,<host2[:vendor]>...")
-	flag.StringVar(&fPrinters, "f", "", "file that contain name or IP addresses of print devices, one per line <host>[:vendor]")
+	flag.StringVar(&fPrinters, "f", "", "file that contain names or IP addresses of print devices, one per line <host>[:vendor]")
 	flag.StringVar(&export, "format", "xml", "output format: xml|json|csv")
 	flag.StringVar(&outfile, "o", "", "output file name.")
 	flag.Parse()
@@ -120,9 +126,9 @@ func getConfig() error {
 		}
 	}
 
-	if len(printers) == 0 {
+	if len(printers) == 0 { //  && ((len(iPrinters) > 0) || (len(fPrinters) > 0)) {
 		flag.Usage()
-		return fmt.Errorf("Printers list is empty")
+		return nil //fmt.Errorf("Devices list is empty")
 	}
 
 	// Set vendor for each printer
