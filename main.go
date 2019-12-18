@@ -7,35 +7,17 @@ import (
 	pp "github.com/azay-ru/pp/app"
 )
 
-//
-
 func main() {
 	log.SetOutput(os.Stderr)
 
-	if err := pp.SetOpts(); err != nil {
-		log.Println(err)
-		return
+	if err := pp.Config.Init(); err != nil {
+		log.Fatalln(err)
 	}
-	return
 
-	// if err := pp.GetConfig(version); err != nil {
-	// 	log.Fatalf(err.Error())
-	// }
+	if err := pp.GetCounters(); err != nil {
+		log.Fatalln(err)
+	}
 
-	// if len(PrintDevices) == 0 {
-	// 	return
-	// }
+	pp.ExportXML()
 
-	// for i := 0; i < len(PrintDevices); i++ {
-	// 	// for _, p := range PrintDevices {
-	// 	if err := GetData(&PrintDevices[i]); err != nil {
-	// 		log.Println(err.Error())
-	// 	} else {
-	// 		PrintDevices[i].ok = true
-	// 		// fmt.Printf("---\n%v\n---\n", PrintDevices[i])
-	// 	}
-	// }
-
-	// Export(&PrintDevices)
-	// // fmt.Printf("===\n%# v\n", pretty.Formatter(PrintDevices)) // debug print
 }

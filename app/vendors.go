@@ -6,10 +6,12 @@ import (
 	"io/ioutil"
 )
 
-type Vendor struct {
+var Vendor VendorType
+
+type VendorType struct {
 	XMLName xml.Name `xml:"vendors"`
 	Text    string   `xml:",chardata"`
-	Vendor  []struct {
+	Vendors []struct {
 		Text      string `xml:",chardata"`
 		ID        string `xml:"id,attr"`
 		Serial    string `xml:"serial"`
@@ -25,14 +27,13 @@ type Vendor struct {
 	} `xml:"vendor"`
 }
 
-var Vendors = Vendor{}
-
-// ReadVendors reading data Vendors definition from xml file
-func ReadVendors(file string) error {
-	xmlContent, err := ioutil.ReadFile(file)
+func (v *VendorType) Init(file string) error {
+	xmlData, err := ioutil.ReadFile(file)
 	if err != nil {
-		return fmt.Errorf("Error reading vendors definition from %s\n", file)
+		return fmt.Errorf("Invalid options \"-v %s\"\n", file)
 	}
-
-	return xml.Unmarshal(xmlContent, &Vendors)
+	if err := xml.Unmarshal(xmlData, &v); err != nil {
+		return err
+	}
+	return nil
 }
