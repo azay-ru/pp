@@ -1,4 +1,3 @@
 #! /bin/sh
 
-now=$(date +%Y%d%m)
-go install -ldflags "-X main.version=$now"
+go install -ldflags "-X github.com/azay-ru/pp/app.version=$(date +%Y%d%m)"
