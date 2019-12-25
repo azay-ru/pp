@@ -12,9 +12,12 @@ import (
 )
 
 // For production use build scripts from /build directory
-var version = "Undefined"
+var version = "*	Undefined"
 
 var Config ConfigType
+var OIDs map[string]string
+
+// var Columns FieldsMap //map[string]string
 
 type Device struct {
 	Host     string
@@ -24,31 +27,45 @@ type Device struct {
 type ConfigType struct {
 	SkipEmpty  bool
 	DontDetect bool
+	Timeout    int
+	Safe       bool
 	Output     string
 	Devices    []Device
 }
 
 func (c *ConfigType) Init() error {
 	flag.Usage = func() {
-		fmt.Printf("Printed pages, v.%s\nUsage:\npp -p <...> | -f <file> [-no][-skip][-v] [-vendors <file>] [-format xml|json|csv] [-o <file>]\n\n", version)
+		fmt.Printf("Printed pages, v.%s\nUsage:\npp -p <...> | -f <file> [-columns <...>] [-v <file>] [-t <n>] [-o <file>]\n\n", version)
 		flag.PrintDefaults()
 	}
 
 	var printers []string // temp buffer, collect data from -p and -f options
 	var pPrinters string
 	var fPrinters string
-	var vendorsFile string
+	var vFile string
+	var items string
 	var help bool
 	flag.BoolVar(&help, "h", false, "Show this help")
 	flag.StringVar(&pPrinters, "p", "", "list of print devices (IP address of network name), comma separated: <host1[:vendor]>,<host2[:vendor]>...")
 	flag.StringVar(&fPrinters, "f", "", "file that contain names or IP addresses of print devices, one per line <host>[:vendor]")
-	flag.StringVar(&vendorsFile, "v", "vendors.xml", "file with Vendors description")
+	flag.StringVar(&vFile, "v", "vendors.json", "Vendors file")
 	flag.StringVar(&Config.Output, "o", "", "output file, use \"-o now\" for current time filename. ")
+	flag.StringVar(&items, "items", "", "set of fields, specified in file from -v options")
+	flag.IntVar(&Config.Timeout, "t", 15, "Timeout in seconds")
+	flag.BoolVar(&Config.Safe, "safe", false, "Safe mode")
 	flag.Parse()
 
 	if help {
 		flag.Usage()
 		return nil
+	}
+
+	if err := GetFields(items); err != nil {
+		return fmt.Errorf("Ivalid set of items %v:\n", err)
+	}
+
+	if Config.Timeout < 0 && Config.Timeout > 60 {
+		return fmt.Errorf("Incorrect timeout %v:\n", Config.Timeout)
 	}
 
 	// Add printers from -p <...>
@@ -59,12 +76,12 @@ func (c *ConfigType) Init() error {
 	// Add printers from -f <file>
 	if len(fPrinters) > 0 {
 		if _, err := os.Stat(fPrinters); os.IsExist(err) {
-			return fmt.Errorf("File %v not found\n", fPrinters)
+			return fmt.Errorf("File %v not found:\n", fPrinters)
 		}
 
 		file, err := os.Open(fPrinters)
 		if err != nil {
-			return fmt.Errorf("Can't read file %v or file not exists\n", fPrinters)
+			return fmt.Errorf("Can't read file %v or file not exists:\n", fPrinters)
 		}
 		defer file.Close()
 
@@ -99,15 +116,29 @@ func (c *ConfigType) Init() error {
 
 	// This params maybe better set from flags
 	gosnmp.Default.Retries = 1
-	gosnmp.Default.Timeout = 5 * time.Second
+	gosnmp.Default.Timeout = time.Duration(Config.Timeout) * time.Second
 	gosnmp.Default.ExponentialTimeout = false
 
 	// Read data from Vendors file
-	if err := Vendor.Init(vendorsFile); err != nil {
-		return err
+	if err := Vendors.Init(vFile); err != nil {
+		return fmt.Errorf("Error init vendors %v\n", err)
 	}
 
 	// fmt.Printf("% #v\n", pretty.Formatter(v))
+
+	return nil
+}
+
+func GetFields(f string) error {
+	// Columns = make(FieldsMap)
+
+	for _, col := range strings.Split(f, ",") {
+		Items = append(Items, col)
+	}
+
+	if len(Items) == 0 {
+		return fmt.Errorf("Fields not defined")
+	}
 
 	return nil
 }
