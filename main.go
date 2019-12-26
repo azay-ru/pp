@@ -8,13 +8,15 @@ import (
 )
 
 func main() {
+	// All error to stderr
 	log.SetOutput(os.Stderr)
 
+	// Init devices list, vendors
 	if err := pp.Config.Init(); err != nil {
 		log.Fatalln(err)
 	}
 
-	if err := pp.GetCounters(); err != nil {
+	if err := pp.Count(); err != nil {
 		log.Fatalln(err)
 	}
 

@@ -23,28 +23,22 @@ const (
 	CSV
 )
 
-var Counters []Counter
+var Counters []string	//[]Counter
 
-type Counter struct {
-	Host         string `xml:"host,attr" json:"host"`
-	Serial       string `xml:"serial" json:"id"`
-	PrintedPages string `xml:"printed_pages" json:"printed_pages"`
-	ScannedPages string `xml:"scanned_pages" json:"scanned_pages"`
-	// CartridgePages string `xml:"cartridge_id" json:"cartridge_id"`
+// type Counter struct {
+// 	Host         string `xml:"host,attr" json:"host"`
+// 	Serial       string `xml:"serial" json:"id"`
+// 	PrintedPages string `xml:"printed_pages" json:"printed_pages"`
+// 	ScannedPages string `xml:"scanned_pages" json:"scanned_pages"`
+// 	// CartridgePages string `xml:"cartridge_id" json:"cartridge_id"`
 
-	export byte   `xml:"-" json:"-"`
-	vendor string `xml:"-" json:"-"`
-	ok     bool   `xml:"-" json:"-"`
-}
+// 	export byte   `xml:"-" json:"-"`
+// 	vendor string `xml:"-" json:"-"`
+// 	ok     bool   `xml:"-" json:"-"`
+// }
 
-// DiscoveryVendor try detect vendor type sending some SNMP request
-func DiscoveryVendor() ([]string, error) {
-
-	return []string{}, nil
-}
-
-// Get() send SNMP requests and Retreive answer for one device
-func (d *Device) Request() (c Counter, err error) {
+// Request() send SNMP requests and Retreive answer for one device
+func (d *Device, oids *string) Request() (c Counter, err error) {
 	gosnmp.Default.Target = d.Host
 
 	if err := gosnmp.Default.Connect(); err != nil {
@@ -73,8 +67,23 @@ func (d *Device) Request() (c Counter, err error) {
 }
 
 // GetCounters get counters from all defined devices
-func GetCounters() error {
+func Count() error {
+
+	// for v := range(Vendors) {
+	// 	for _, i := range Items {
+	// 		fmt.Println(v, i, Vendors[v][i])
+	// 	}
+	// }
+
 	for _, d := range Config.Devices {
+		fmt.Println()
+
+		// Safe mode = send one OID per one SNMP request
+		if Config.Safe {
+
+		} else { 
+
+		}
 
 		counter, err := d.Request()
 		if err != nil {
@@ -101,6 +110,7 @@ func DecodeASN1(v gosnmp.SnmpPDU) string {
 }
 
 func ExportXML() error {
+
 	type XML struct {
 		XMLName  xml.Name  `xml:"devices"`
 		Counters []Counter `xml:"device"`

@@ -61,7 +61,7 @@ func (c *ConfigType) Init() error {
 	}
 
 	if err := GetFields(items); err != nil {
-		return fmt.Errorf("Ivalid set of items %v:\n", err)
+		return err
 	}
 
 	if Config.Timeout < 0 && Config.Timeout > 60 {
@@ -93,11 +93,16 @@ func (c *ConfigType) Init() error {
 	}
 
 	if len(printers) == 0 { //  && ((len(iPrinters) > 0) || (len(fPrinters) > 0)) {
-		return fmt.Errorf("Nothing to do")
+		return fmt.Errorf("Empty list of tested devices")
 	}
 
+	// Read data from Vendors file
+	if err := Vendors.Init(vFile); err != nil {
+		return err
+	}
+	
 	// Set Vendors from dirty data -p and -f options
-	c.Devices = make([]Device, 0, 32)
+	c.Devices = make([]Device, 0, 128)
 	for _, row := range printers {
 		col := strings.Split(row, ":")
 
@@ -119,19 +124,12 @@ func (c *ConfigType) Init() error {
 	gosnmp.Default.Timeout = time.Duration(Config.Timeout) * time.Second
 	gosnmp.Default.ExponentialTimeout = false
 
-	// Read data from Vendors file
-	if err := Vendors.Init(vFile); err != nil {
-		return fmt.Errorf("Error init vendors %v\n", err)
-	}
-
 	// fmt.Printf("% #v\n", pretty.Formatter(v))
 
 	return nil
 }
 
 func GetFields(f string) error {
-	// Columns = make(FieldsMap)
-
 	for _, col := range strings.Split(f, ",") {
 		Items = append(Items, col)
 	}
