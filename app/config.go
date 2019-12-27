@@ -17,11 +17,10 @@ var version = "*	Undefined"
 var Config ConfigType
 var OIDs map[string]string
 
-// var Columns FieldsMap //map[string]string
-
 type Device struct {
 	Host     string
 	VendorID string
+	Counter  gosnmp.SnmpPDU
 }
 
 type ConfigType struct {
@@ -49,6 +48,7 @@ func (c *ConfigType) Init() error {
 	flag.StringVar(&pPrinters, "p", "", "list of print devices (IP address of network name), comma separated: <host1[:vendor]>,<host2[:vendor]>...")
 	flag.StringVar(&fPrinters, "f", "", "file that contain names or IP addresses of print devices, one per line <host>[:vendor]")
 	flag.StringVar(&vFile, "v", "vendors.json", "Vendors file")
+
 	flag.StringVar(&Config.Output, "o", "", "output file, use \"-o now\" for current time filename. ")
 	flag.StringVar(&items, "items", "", "set of fields, specified in file from -v options")
 	flag.IntVar(&Config.Timeout, "t", 15, "Timeout in seconds")
@@ -100,32 +100,31 @@ func (c *ConfigType) Init() error {
 	if err := Vendors.Init(vFile); err != nil {
 		return err
 	}
-	
+
 	// Set Vendors from dirty data -p and -f options
 	c.Devices = make([]Device, 0, 128)
+
 	for _, row := range printers {
+
 		col := strings.Split(row, ":")
+		if len(col) >= 2 {
 
-		device := Device{}
-		if len(col) >= 1 { // Take first param
-			device.Host = col[0]
-
-			if len(col) >= 2 { // Take second param
-				device.VendorID = strings.ToLower(col[1])
+			// Host not empty and VendorID exists in Vendors Map
+			if _, ok := Vendors[col[1]]; ok && len(col[0]) > 0 {
+				device := Device{}
+				device.Host = col[0]
+				device.VendorID = col[1]
+				c.Devices = append(c.Devices, device)
 			}
-		}
-		if len(device.Host) > 0 {
-			c.Devices = append(c.Devices, device)
 		}
 	}
 
 	// This params maybe better set from flags
 	gosnmp.Default.Retries = 1
-	gosnmp.Default.Timeout = time.Duration(Config.Timeout) * time.Second
 	gosnmp.Default.ExponentialTimeout = false
 
 	// fmt.Printf("% #v\n", pretty.Formatter(v))
-
+	gosnmp.Default.Timeout = time.Duration(Config.Timeout) * time.Second
 	return nil
 }
 
