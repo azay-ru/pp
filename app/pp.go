@@ -10,33 +10,28 @@ import (
 
 var Counters VendorsMap
 
-// Request() send SNMP requests and Retreive answer for one device
-func (d *Device) Request(oids []string) (answer []gosnmp.SnmpPDU, err error) {
+// Request() send SNMP requests and Retrieve answer for one device
+// func (d *Device) Request(oids []string) (answer []gosnmp.SnmpPDU, err error) {
+func (d *Device) Request(oids []string) (answer []string, err error) {
 	gosnmp.Default.Target = d.Host
+	answer = make([]string, 0, len(Fields))
 
 	if err := gosnmp.Default.Connect(); err != nil {
-		return fmt.Errorf("Can't connect to %v: %v\n", d.Host, err)
+		return answer, fmt.Errorf("Can't connect to %v: %v\n", d.Host, err)
 
 	}
 	defer gosnmp.Default.Conn.Close()
 
-	// Vendor.Vendors[0].Cartridge.Printed
-	if answer, err := gosnmp.Default.Get(oids); err != nil {
+	// var result gosnmp.SnmpPacket
+	// var err error
+	if result, err := gosnmp.Default.Get(oids); err != nil {
 		log.Printf("Error SNMP request to %v\n", d.Host)
-	} 
-		fmt.Println(result.Variables)
-		// for n, v := range result.Variables {
-		// 	switch n {
-		// 	case 0:
-		// 		c.Serial = DecodeASN1(v)
-		// 	case 1:
-		// 		c.PrintedPages = DecodeASN1(v) //snmp.ToBigInt(v.Value)
-		// 	}
-		// }
-
-	// c.ok = true
-	// c.Host = d.Host
-	return 
+	} else {
+		for _, v := range result.Variables {
+			answer = append(answer, DecodeASN1(v))
+		}
+	}
+	return
 }
 
 // GetCounters get counters from all defined devices
@@ -50,22 +45,25 @@ func Count() error {
 
 	Counters = make(VendorsMap)
 
-	for _, d := range Config.Devices {
+	for _, d := range Devices {
 
 		// slice for all oids per one device
-		oids := make([]string, 0, len(Items))
+		oids := make([]string, 0, len(Fields))
 		// answer := make([]string, 0, len(Items))
 
-		for _, i := range Items { //Vendors[d.VendorID]  {
+		// oids collect all OIDs each
+		for _, i := range Fields { //Vendors[d.VendorID]  {
 			oids = append(oids, Vendors[d.VendorID][i])
 			// fmt.Printf("%s=%s ", i, Vendors[d.VendorID][i])
 		}
 
 		// Request
-		fmt.Println("Host", d.Host)
+		fmt.Println("Host", d.Host, d.VendorID)
 		fmt.Println(oids, "\n")
-		if err := d.Request(oids); err != nil {
+		if resp, err := d.Request(oids); err != nil {
 			return err
+		} else {
+			fmt.Println(resp)
 		}
 
 		// }

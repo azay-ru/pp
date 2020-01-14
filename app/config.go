@@ -12,16 +12,11 @@ import (
 )
 
 // For production use build scripts from /build directory
-var version = "*	Undefined"
-
-var Config ConfigType
+var version = "Undefined"
 var OIDs map[string]string
-
-type Device struct {
-	Host     string
-	VendorID string
-	Counter  gosnmp.SnmpPDU
-}
+var Config ConfigType
+var Fields []string
+var Devices []Device
 
 type ConfigType struct {
 	SkipEmpty  bool
@@ -29,7 +24,12 @@ type ConfigType struct {
 	Timeout    int
 	Safe       bool
 	Output     string
-	Devices    []Device
+}
+
+type Device struct {
+	Host     string
+	VendorID string
+	Counter  gosnmp.SnmpPDU
 }
 
 func (c *ConfigType) Init() error {
@@ -39,18 +39,18 @@ func (c *ConfigType) Init() error {
 	}
 
 	var printers []string // temp buffer, collect data from -p and -f options
-	var pPrinters string
-	var fPrinters string
+	var pDevices string
+	var fDevices string
 	var vFile string
-	var items string
+	var fields string
 	var help bool
 	flag.BoolVar(&help, "h", false, "Show this help")
-	flag.StringVar(&pPrinters, "p", "", "list of print devices (IP address of network name), comma separated: <host1[:vendor]>,<host2[:vendor]>...")
-	flag.StringVar(&fPrinters, "f", "", "file that contain names or IP addresses of print devices, one per line <host>[:vendor]")
+	flag.StringVar(&pDevices, "p", "", "list of print devices (IP address of network name), comma separated: <host1[:vendor]>,<host2[:vendor]>...")
+	flag.StringVar(&fDevices, "f", "", "file that contain names or IP addresses of print devices, one per line <host>[:vendor]")
 	flag.StringVar(&vFile, "v", "vendors.json", "Vendors file")
 
 	flag.StringVar(&Config.Output, "o", "", "output file, use \"-o now\" for current time filename. ")
-	flag.StringVar(&items, "items", "", "set of fields, specified in file from -v options")
+	flag.StringVar(&fields, "fields", "", "set of fields, specified in Vendors file")
 	flag.IntVar(&Config.Timeout, "t", 15, "Timeout in seconds")
 	flag.BoolVar(&Config.Safe, "safe", false, "Safe mode")
 	flag.Parse()
@@ -60,7 +60,7 @@ func (c *ConfigType) Init() error {
 		return nil
 	}
 
-	if err := GetFields(items); err != nil {
+	if err := GetFields(fields); err != nil {
 		return err
 	}
 
@@ -68,20 +68,20 @@ func (c *ConfigType) Init() error {
 		return fmt.Errorf("Incorrect timeout %v:\n", Config.Timeout)
 	}
 
-	// Add printers from -p <...>
-	if len(pPrinters) > 0 {
-		printers = strings.Split(pPrinters, ",")
+	// Add devices from -p <...>
+	if len(pDevices) > 0 {
+		printers = strings.Split(pDevices, ",")
 	}
 
-	// Add printers from -f <file>
-	if len(fPrinters) > 0 {
-		if _, err := os.Stat(fPrinters); os.IsExist(err) {
-			return fmt.Errorf("File %v not found:\n", fPrinters)
+	// Add devices from -f <file>
+	if len(fDevices) > 0 {
+		if _, err := os.Stat(fDevices); os.IsExist(err) {
+			return fmt.Errorf("File %v not found:\n", fDevices)
 		}
 
-		file, err := os.Open(fPrinters)
+		file, err := os.Open(fDevices)
 		if err != nil {
-			return fmt.Errorf("Can't read file %v or file not exists:\n", fPrinters)
+			return fmt.Errorf("Can't read file %v or file not exists:\n", fDevices)
 		}
 		defer file.Close()
 
@@ -93,19 +93,20 @@ func (c *ConfigType) Init() error {
 	}
 
 	if len(printers) == 0 { //  && ((len(iPrinters) > 0) || (len(fPrinters) > 0)) {
-		return fmt.Errorf("Empty list of tested devices")
+		return fmt.Errorf("Device list is empty")
 	}
 
-	// Read data from Vendors file
+	// Read data from Vendors file (json)
 	if err := Vendors.Init(vFile); err != nil {
 		return err
 	}
 
 	// Set Vendors from dirty data -p and -f options
-	c.Devices = make([]Device, 0, 128)
+	Devices = make([]Device, 0, 128)
 
 	for _, row := range printers {
 
+		// one valid dirty record is <host>:<vendor ID>
 		col := strings.Split(row, ":")
 		if len(col) >= 2 {
 
@@ -114,7 +115,7 @@ func (c *ConfigType) Init() error {
 				device := Device{}
 				device.Host = col[0]
 				device.VendorID = col[1]
-				c.Devices = append(c.Devices, device)
+				Devices = append(Devices, device)
 			}
 		}
 	}
@@ -130,11 +131,12 @@ func (c *ConfigType) Init() error {
 
 func GetFields(f string) error {
 	for _, col := range strings.Split(f, ",") {
-		Items = append(Items, col)
+		if len(col) > 0 {
+			Fields = append(Fields, col)
+		}
 	}
-
-	if len(Items) == 0 {
-		return fmt.Errorf("Fields not defined")
+	if len(Fields) == 0 {
+		return fmt.Errorf("Fields not defined. See Vendors file and set options -fields")
 	}
 
 	return nil
