@@ -17,6 +17,7 @@ var OIDs map[string]string
 var Config ConfigType
 var Fields []string
 var Devices []Device
+var Сounters VendorsMap
 
 type ConfigType struct {
 	SkipEmpty  bool
@@ -29,7 +30,7 @@ type ConfigType struct {
 type Device struct {
 	Host     string
 	VendorID string
-	Counter  gosnmp.SnmpPDU
+	Counter  []string
 }
 
 func (c *ConfigType) Init() error {
@@ -60,12 +61,12 @@ func (c *ConfigType) Init() error {
 		return nil
 	}
 
-	if err := GetFields(fields); err != nil {
-		return err
-	}
-
 	if Config.Timeout < 0 && Config.Timeout > 60 {
 		return fmt.Errorf("Incorrect timeout %v:\n", Config.Timeout)
+	}
+
+	if err := GetFields(fields); err != nil {
+		return err
 	}
 
 	// Add devices from -p <...>
@@ -119,6 +120,7 @@ func (c *ConfigType) Init() error {
 			}
 		}
 	}
+	Counters = make(VendorsMap, len(Devices))
 
 	// This params maybe better set from flags
 	gosnmp.Default.Retries = 1

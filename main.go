@@ -20,6 +20,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// pp.ExportXML()
-
+	if err := pp.Export(); err != nil {
+		log.Fatalln(err)
+	}
 }

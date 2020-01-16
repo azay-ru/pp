@@ -1,6 +1,7 @@
 package pp
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strconv"
@@ -43,27 +44,32 @@ func Count() error {
 	// 	}
 	// }
 
-	Counters = make(VendorsMap)
-
-	for _, d := range Devices {
+	for n := 0; n < len(Devices); n++ {
 
 		// slice for all oids per one device
 		oids := make([]string, 0, len(Fields))
-		// answer := make([]string, 0, len(Items))
 
 		// oids collect all OIDs each
 		for _, i := range Fields { //Vendors[d.VendorID]  {
-			oids = append(oids, Vendors[d.VendorID][i])
+			oids = append(oids, Vendors[Devices[n].VendorID][i])
 			// fmt.Printf("%s=%s ", i, Vendors[d.VendorID][i])
 		}
 
 		// Request
-		fmt.Println("Host", d.Host, d.VendorID)
-		fmt.Println(oids, "\n")
-		if resp, err := d.Request(oids); err != nil {
+		// fmt.Println("Host", d.Host, d.VendorID)
+		// fmt.Println(oids, "\n")
+		if resp, err := Devices[n].Request(oids); err != nil {
 			return err
 		} else {
-			fmt.Println(resp)
+			Devices[n].Counter = resp
+
+			// Build counter object
+			fm := make(FieldsMap, len(Fields))
+			for x, j := range Fields {
+				fm[j] = resp[x]
+			}
+			Counters[Devices[n].Host] = fm
+
 		}
 
 		// }
@@ -75,15 +81,17 @@ func Count() error {
 
 		}
 
-		// counter, err := d.Request()
-		// if err != nil {
-		// 	log.Println(err.Error())
-		// }
-
-		// Counters = append(Counters, counter)
 	}
 
 	return nil
+}
+
+func Export() error {
+	b, err := json.MarshalIndent(Counters, "", "  ")
+	if err == nil {
+		fmt.Println(string(b))
+	}
+	return err
 }
 
 // DecodeASN1 convert ANS.1 field to printable type
