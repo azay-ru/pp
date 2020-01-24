@@ -11,6 +11,8 @@ import (
 	"github.com/soniah/gosnmp"
 )
 
+const Delimiter = ";"
+
 // For production use build scripts from /build directory
 var version = "Undefined"
 var OIDs map[string]string
@@ -18,13 +20,16 @@ var Config ConfigType
 var Fields []string
 var Devices []Device
 var Сounters VendorsMap
+var Formats []string = []string{"json", "csv"}
 
 type ConfigType struct {
 	SkipEmpty  bool
 	DontDetect bool
 	Timeout    int
-	Safe       bool
 	Output     string
+	Format     int
+	Header     bool
+	// Safe       bool 	// to-do, maybe later
 }
 
 type Device struct {
@@ -44,21 +49,30 @@ func (c *ConfigType) Init() error {
 	var fDevices string
 	var vFile string
 	var fields string
+	var format string
 	var help bool
 	flag.BoolVar(&help, "h", false, "Show this help")
 	flag.StringVar(&pDevices, "p", "", "list of print devices (IP address of network name), comma separated: <host1[:vendor]>,<host2[:vendor]>...")
 	flag.StringVar(&fDevices, "f", "", "file that contain names or IP addresses of print devices, one per line <host>[:vendor]")
 	flag.StringVar(&vFile, "v", "vendors.json", "Vendors file")
-
-	flag.StringVar(&Config.Output, "o", "", "output file, use \"-o now\" for current time filename. ")
+	flag.StringVar(&format, "format", "json", "Output format")
+	flag.StringVar(&Config.Output, "o", "", "output file, default stdout")
 	flag.StringVar(&fields, "fields", "", "set of fields, specified in Vendors file")
 	flag.IntVar(&Config.Timeout, "t", 15, "Timeout in seconds")
-	flag.BoolVar(&Config.Safe, "safe", false, "Safe mode")
+	flag.BoolVar(&Config.Header, "header", false, "Insert header for CSV format")
+	//flag.BoolVar(&Config.Safe, "safe", false, "Safe mode")	// to-do, maybe later
 	flag.Parse()
 
 	if help {
 		flag.Usage()
 		return nil
+	}
+
+	//
+	for n, v := range Formats {
+		if format == v {
+			Config.Format = n
+		}
 	}
 
 	if Config.Timeout < 0 && Config.Timeout > 60 {
